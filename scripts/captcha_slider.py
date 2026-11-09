@@ -37,10 +37,25 @@ def _frame(page):
 
 
 def visible(page):
-    if _frame(page):
-        return True
+    """滑块是否真的在屏幕上。
+
+    不能用「元素存在」判断：点关闭后 DOM 里 wrapper/iframe 仍然残留，
+    会误判成"还在弹"，导致反复重置、白等好几轮。
+    """
     try:
-        return bool(page.query_selector("#tcaptcha_wrapper_transform_dy"))
+        return bool(page.evaluate("""() => {
+            const shown = el => {
+                if (!el) return false;
+                const r = el.getBoundingClientRect();
+                if (r.width < 20 || r.height < 20) return false;
+                const cs = getComputedStyle(el);
+                if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+                return parseFloat(cs.opacity || '1') > 0.05;
+            };
+            if (shown(document.querySelector('#t_mask'))) return true;
+            if (shown(document.querySelector('#tcaptcha_wrapper_transform_dy'))) return true;
+            return false;
+        }"""))
     except Exception:
         return False
 
@@ -234,6 +249,9 @@ def solve(page, tries=8, debug_prefix=None):
     """求解滑块。True=通过（或本就没弹），False=轮次用尽。"""
     piece_moved = 0
     for attempt in range(1, tries + 1):
+        if not visible(page):
+            # 弹窗已不在（含关闭后 DOM 残留的情况）
+            return True
         fr = _frame(page)
         if not fr:
             return True

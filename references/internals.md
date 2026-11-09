@@ -86,3 +86,13 @@ crop = atlas.crop((cx, cy, cx+cw, cy+ch))
 - Chrome 被 shell 作业对象回收时（Popen 后命令一结束进程消失，
   `CREATE_BREAKAWAY_FROM_JOB` 报 WinError 5），用常驻宿主进程持有 Chrome
 - 本机访问 `127.0.0.1` 别走系统代理（curl 加 `--noproxy '*'`）
+
+## 9. 用「元素存在」判断滑块是否弹出（会白跑好几轮）
+
+点 `.tc-close-icon` 关闭后，`#tcaptcha_wrapper_transform_dy` 与 iframe 仍在 DOM 里，
+只是隐藏了。若 `visible()` 用 `query_selector(...)`/`_frame()` 是否存在来判断，
+会一直认为"还在弹"，于是反复重置 → 每轮都算出 `dist≈0`（此时缺口与拼图块位置
+被读成同一处）→ 空耗 8 轮。
+
+正确判定：`getBoundingClientRect()` 尺寸 > 20 且 `display!=none`/`visibility!=hidden`/
+`opacity>0.05`。`solve()` 每轮开头也要先 `if not visible(page): return True`。
